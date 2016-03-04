@@ -1,0 +1,16 @@
+Package: GEA
+Type: Package
+Title: Generalized Enrichment Analysis
+Version: 1.0
+Date: 2016-02-08
+Author: Rainer Winnenburg [aut, cre],
+  Nigam H Shah [aut]
+Maintainer: Rainer Winnenburg <winnenbr@stanford.edu>
+Description: This implemntation of Generalized Enrichment Analysis (GEA) can be used to improve the detection of adverse drug events from the biomedical literature.
+License: Apache License 2.0 | file LICENSE
+Depends: R (>= 3.1.0),
+  data.table
+Imports: ROCR
+Suggests: ggplot2
+VignetteBuilder: knitr
+RoxygenNote: 5.0.1
