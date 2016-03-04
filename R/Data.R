@@ -15,7 +15,7 @@
 #' @export
 GS <- function(gs_name) {
   
-  set <- read.csv(system.file("extdata", gs_name, package = "GEA2"))
+  set <- read.csv(system.file("extdata", gs_name, package = "GEA"))
   
   set$set_bin = NA 
   set <- within(set, set_bin[set=="POS"] <- 1)
@@ -46,7 +46,7 @@ GS <- function(gs_name) {
 #' @export
 Drugs <- function(drug_filename, classLevel=FALSE) {
   
-  ATC_annotations <- read.csv(unz(system.file("extdata", gsub(".txt", ".zip", drug_filename), package = "GEA2"), drug_filename ),
+  ATC_annotations <- read.csv(unz(system.file("extdata", gsub(".txt", ".zip", drug_filename), package = "GEA"), drug_filename ),
     "",
     sep="\t", header=FALSE,check.names=FALSE, fill=TRUE)
   
@@ -90,7 +90,7 @@ Drugs <- function(drug_filename, classLevel=FALSE) {
 AdverseEvents <- function(event_filename ) {
   
   MeSH_annotations <- fread(
-    system.file("extdata", event_filename, package = "GEA2"),
+    system.file("extdata", event_filename, package = "GEA"),
     sep="\t", header=FALSE, data.table=FALSE
   )
   
