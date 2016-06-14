@@ -1,8 +1,8 @@
 .onLoad <- function(libname, pkgname) {  
 
   #Load all background information (independent of analysis specific parameters, such as abstraction layer, set of interest, etc.)
-  data(mesh_background_frequencies_MEDLINE, mesh_hierarchy, mesh_preferred_terms, mesh_hierarchy_TC, cofhash110, mtrees2015, mesh_preferred_terms_dict, mesh_preferred_terms_table, mesh_hierarchy_TC, package=pkgname, envir=parent.env(environment()))
-}
+  data(mesh_background_frequencies_MEDLINE, mesh_preferred_terms, mesh_preferred_terms_dict, mesh_hierarchy_TC, cofhash110,  background_total, package=pkgname, envir=parent.env(environment()))
+  }
 
 
 #' Abstraction Layer on annotation terms (MeSH)
@@ -180,7 +180,7 @@ getPRR <- function(atccode, event, abstraction=getAbstractionLayer(c(4,7))) {
 #' @export
 getEnrichment<- function(set_of_interest, abstraction=getAbstractionLayer(c(4,7)), threshold=0.1, filter=c(),adjust=FALSE) {
 
-  total <- 21850751
+  total <- background_total
 
   abstraction_range <- abstraction$range
 
