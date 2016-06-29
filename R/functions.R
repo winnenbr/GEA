@@ -211,6 +211,109 @@ getEnrichment<- function(set_of_interest, abstraction=getAbstractionLayer(c(4,7)
     phyper((m-1), l , (a1-l), o, lower.tail=FALSE) * phyper( (r-1), p, (z-p) , q, lower.tail=FALSE)
   }
 
+  getAdjustedPValues <- function(result_matrix,annotation_anc1,threshold = 0.05) {
+  
+    #returns the number of PMID IDs for documents with both terms in index
+    getCoFrequency <- function(term1,term2) {
+      
+      cf <- 0
+      
+      if (term1<=term2) {
+        cf <- cofhash[[term1]][[term2]]
+      } else {
+        cf <- cofhash[[term2]][[term1]]
+      }
+      
+      if (length(cf)==0) {
+        cf = 0
+      }
+      
+      return(cf)
+    }
+    
+    getCoFrequencies <- function(terms) {
+      
+      tmp <- outer(terms,terms, Vectorize(getCoFrequency))
+      split(tmp, rep(1:ncol(tmp), each = nrow(tmp)))  
+    }
+    
+    #returns the number of PMID IDs for documents with both terms in index
+    getLocalCoFrequency <- function(term1,term2,precalc) {
+      
+      return(length(intersect( precalc[precalc$parent==term1,"PMID"][[1]] , precalc[precalc$parent==term2,"PMID" ][[1]])) ) 
+    }
+    
+    getLocalCoFrequencies <- function(terms,precalc) {
+      
+      tmp <- outer(terms,terms, Vectorize(getLocalCoFrequency, c("term1","term2")),precalc )
+      split(tmp, rep(1:ncol(tmp), each = nrow(tmp)))  
+    }
+    
+    getLocalCoRestrictedFrequency <- function(term1,term2,annotation_anc1,precalc) {
+
+      return(length(intersect(setdiff(annotation_anc1[, ]$PMID, annotation_anc1[parent==term1,]$PMID),annotation_anc1[parent==term2,]$PMID)))
+    }
+    
+    getLocalCoRestrictedFrequencies <- function(terms,annotation_anc1,precalc) {
+      tmp <- outer(terms,terms, Vectorize(getLocalCoRestrictedFrequency, c("term1","term2")),annotation_anc1,precalc )
+      split(tmp, rep(1:ncol(tmp), each = nrow(tmp)))  
+    }
+    
+
+    mask1 <- data.table(a1=result_matrix[,parent2])
+    mask1[ ,as.character(result_matrix[,parent2]):=as.character(result_matrix[,parent2])]
+    mask1[,a1:=NULL]
+
+    mask2 <- as.data.table(t(mask1))
+    mask1 <- as.data.table(t(t(mask1)))
+
+    l <- data.table(a1=getFrequency(as.matrix(mask1[[1]])))
+    l[, c(as.character(result_matrix[,parent2])) :=  getCoFrequencies(as.character(result_matrix[,parent2]))]
+    l<- as.matrix(l[,a1:=NULL])
+
+    o<-result_matrix[,"parent2",with=FALSE]
+    o[, c(as.character(result_matrix[,parent2])) := result_matrix[,count], with = FALSE]
+    o[,parent2:=NULL]
+    o<-as.matrix(t(o))
+
+
+    annotation_anc2 <- as.data.frame(annotation_anc1)
+    annotation_anc2 <- unique(annotation_anc2[,c("PMID","parent")])
+    precalc <- aggregate(PMID ~ parent, annotation_anc2, I)
+    m <- data.table(a1=getFrequency(as.matrix(mask1[[1]])))
+    m[, c(as.character(result_matrix[,parent2])) :=  getLocalCoFrequencies(as.character(result_matrix[,parent2]),precalc)]
+    m<- as.matrix(m[,a1:=NULL])
+
+
+    p <- data.table(a1=getFrequency(as.matrix(mask1[[1]])))
+    p[ ,as.character(result_matrix[,parent2]):=as.numeric(getFrequency(as.matrix(mask1[[1]])))]
+    p[, a1:=NULL]
+    p<-as.matrix(p-l)
+
+	
+    q <- data.table(a1=getFrequency(as.matrix(mask1[[1]])))
+    q[ ,as.character(result_matrix[,parent2]):=as.numeric(result_matrix[,total])]
+    q[, a1:=NULL]
+    q<-as.matrix(t(q)-o)
+
+    r <- data.table(a1=getFrequency(as.matrix(mask1[[1]])))
+    r[, c(as.character(result_matrix[,parent2])) :=  getLocalCoRestrictedFrequencies(as.character(result_matrix[,parent2]),annotation_anc1,precalc)]
+    r<- t(as.matrix(r[,a1:=NULL]))
+
+    a1 <- data.table(a2=getFrequency(as.matrix(mask1[[1]])))
+    a1[ ,as.character(result_matrix[,parent2]):=as.numeric(getFrequency(as.matrix(mask1[[1]])))]
+    a1[, a2:=NULL]
+    a1<- as.matrix(t(a1))
+
+	
+    z<-as.matrix(total-a1)
+    
+    pvalues <- getAdjustedPValue(l,o,m,p,q,r,z,a1) 
+    diag(pvalues) <- 0
+
+    apply(pvalues, 1, function(x) max(x))
+  }
+  
   
   # create annotation subset: from all papers select those with the entities (e.g., drugs of interest)
   annotation <- abstraction$annotation[PMID %in% set_of_interest$PMID,  ]
@@ -264,17 +367,34 @@ getEnrichment<- function(set_of_interest, abstraction=getAbstractionLayer(c(4,7)
     # sort by pvalue
     setorder(parent_term_counts,pvalue,-count)
 
+    if (adjust=="BH") {
+      
+      parent_term_counts[, pvalue:= p.adjust(pvalue,"BH")]
+    }
+
     # Only store terms with enrichmnet above given threshold
     result_matrix <- parent_term_counts[ pvalue<threshold,]
     
+
     ##################################################
     # Here check if conditional
     ##################################################
-    
-    #if (nrow(result_matrix)>0) {
-    #  result_matrix <- parent_term_counts[pvalue<threshold,,drop=FALSE]
-    #}
 
+    if (adjust==TRUE & nrow(result_matrix)>1) {
+
+      result_matrix[, pvalue:= getAdjustedPValues(result_matrix,annotation_anc1)]
+      result_matrix2 <- result_matrix
+      result_matrix2 <- rbind(result_matrix2,parent_term_counts[(nrow(result_matrix2)+1):nrow(parent_term_counts),])
+      result_matrix <- result_matrix2
+      
+      # sort by pvalue
+      setorder(result_matrix,pvalue,-count)
+
+
+
+      parent_term_counts <- result_matrix
+      result_matrix <- result_matrix[ pvalue<threshold,]
+    }
     
     abstraction <- c( abstraction, list("result_matrix"=result_matrix,
                                         "annotation_profile" = parent_term_counts[order(pvalue,decreasing=FALSE),],
